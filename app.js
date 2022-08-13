@@ -1,5 +1,19 @@
 const draggable_list = document.getElementById("draggable-list");
+const check = document.getElementById("check");
+const scoreSpan = document.getElementById("score");
+
+// HTMLNodes[]
+const listItems = [];
+// string[]
 const theRichest = [];
+
+let dragStartIndex = 0;
+let score = 0;
+let playing = true;
+
+createList();
+
+check.addEventListener("click", checkOrder);
 
 async function getCurrentRichest() {
   const res = await fetch(
@@ -8,46 +22,83 @@ async function getCurrentRichest() {
     .then((res) => res.json())
     .catch((err) => console.log(err));
 
-  // res.forEach((e) => theRichest.push(e.person.name));
   return res.map((e) => theRichest.push(e.person.name));
 }
 
-document.getElementById("check").addEventListener("click", checkOrder);
-document.getElementById("answers").addEventListener("click", showAnswers);
-
-// Store listitems of HTML nodes
-const listItems = [];
-// helps to swap items
-let dragStartIndex;
-renderHtmlUL(true, draggable_list);
-
 // Insert list items into DOM
-async function renderHtmlUL(rnd, toNode, strArr = []) {
-  let arr;
-  if (rnd) {
-    arr = await getCurrentRichest();
-    arr = randomizeArr(strArr);
-  } else {
-    arr = strArr;
-  }
+async function createList() {
+  await getCurrentRichest();
 
-  arr.forEach((person, index) => {
-    const item = document.createElement("li");
+  const rndArr = randomizeArr(theRichest);
 
-    item.setAttribute("data-index", index);
+  rndArr.forEach((person, index) => {
+    const listItem = document.createElement("li");
 
-    item.innerHTML = `
-        <span class="number">${index + 1}</span>
-        <div class="draggable" draggable="true">
-          <p class="person-name">${person}</p>
-          <i class="fas fa-grip-lines"></i>
-        </div>
-      `;
-    if (rnd) listItems.push(item);
+    listItem.setAttribute("data-index", index);
 
-    toNode.appendChild(item);
+    listItem.innerHTML = returnInnerHtml(index + 1, person);
+
+    listItems.push(listItem);
+
+    draggable_list.appendChild(listItem);
   });
+
   addEventListeners();
+}
+
+function dragStart() {
+  dragStartIndex = +this.closest("li").getAttribute("data-index");
+  console.log("Startting on: ", dragStartIndex);
+}
+
+function dragEnter() {
+  this.classList.add("over");
+}
+
+function dragLeave() {
+  this.classList.remove("over");
+}
+
+function dragOver(e) {
+  e.preventDefault();
+}
+
+function dragDrop() {
+  const dragIndex = +this.getAttribute("data-index");
+  swapItems(dragStartIndex, dragIndex);
+  console.log("Dropping in: ", dragIndex);
+
+  this.classList.remove("over");
+}
+
+// Swap list items that are drag and drop
+function swapItems(fromIndex, toIndex) {
+  const itemOne = listItems[fromIndex].querySelector(".draggable");
+  const itemTwo = listItems[toIndex].querySelector(".draggable");
+
+  listItems[fromIndex].appendChild(itemTwo);
+  listItems[toIndex].appendChild(itemOne);
+}
+
+// Check the order of list items
+function checkOrder() {
+  score = 0;
+
+  listItems.forEach(async (listItem, index) => {
+    const personName = listItem.querySelector(".draggable").innerText;
+    // .trim();
+
+    if (personName === theRichest[index]) {
+      listItem.classList.remove("wrong");
+      listItem.classList.add("right");
+      score += 1 * (index + 1);
+    } else {
+      listItem.classList.add("wrong");
+    }
+  });
+
+  // update score span if haven't seen results
+  if (playing) scoreSpan.textContent = score;
 }
 
 function addEventListeners() {
@@ -59,82 +110,32 @@ function addEventListeners() {
   });
 
   dragListItems.forEach((item) => {
-    item.addEventListener("dragover", (e) => dragOver(e));
+    item.addEventListener("dragover", dragOver);
     item.addEventListener("drop", dragDrop);
     item.addEventListener("dragenter", dragEnter);
     item.addEventListener("dragleave", dragLeave);
   });
 }
 
-// * DRAG HELPERS
-function dragStart() {
-  //   console.log("START to Drag these");
-  // ?custom attribue added on last forEach
-  dragStartIndex = +this.closest("li").getAttribute("data-index");
-  console.log("Starts at: ", dragStartIndex);
-}
-
-function dragEnter() {
-  this.classList.add("over");
-  //   console.log("ENTERING these");
-}
-
-function dragOver(e) {
-  //   console.log("Draggin OVER these");
-  e.preventDefault(); //solved the drop detection problem (love mdn)
-}
-
-function dragLeave() {
-  this.classList.remove("over");
-  //   console.log("LEAVING these");
-}
-
-function dragDrop() {
-  // console.log("DROPPING these");
-  const dragEndIndex = +this.getAttribute("data-index");
-  this.classList.remove("over");
-  // console.log("Dropping at: ", dragEndIndex);
-  swapItems(dragStartIndex, dragEndIndex);
-}
-
-//* Swaping
-function swapItems(fromIndex, toIndex) {
-  const draggedItem = listItems[fromIndex].querySelector(".draggable");
-  const droppedOn = listItems[toIndex].querySelector(".draggable");
-  // console.log(draggedItem, droppedOn);
-  // perform the swap
-  listItems[fromIndex].appendChild(droppedOn);
-  listItems[toIndex].appendChild(draggedItem);
-}
-
-//* Check for correct order
-function checkOrder() {
-  listItems.forEach((item, index) => {
-    const personName = item.querySelector(".draggable").innerText;
-    // .trim();
-
-    if (personName !== theRichest[index]) {
-      item.classList.add("wrong");
-    } else {
-      item.classList.remove("wrong");
-      item.classList.add("right");
-    }
-  });
-}
-
-// end Game logic
-function showAnswers() {}
-
-//* Helpers
+// * HELPERS
 function randomizeArr(arr) {
   /**
-   * Creates an object for every item{"str", rndNum}
-   * sorts the oject whit the rndNum
-   * gets only the "str"'s and puts then in an arr
-   * for every "str" creates an li, updates `listItems` & node `draggable_list`
+   * transforms arr -> object{val:str, sort:int(0-1)}[]
+   * Sorts the [{},{}] by the int(0-1)
+   * returns an arr of only the val:str
    */
-  [...arr]
+  return arr
     .map((a) => ({ value: a, sort: Math.random() }))
     .sort((a, b) => a.sort - b.sort)
     .map((a) => a.value);
+}
+
+function returnInnerHtml(index, person) {
+  return `
+  <span class="number">${index}</span>
+  <div class="draggable" draggable="true">
+    <p class="person-name">${person}</p>
+    <i class="fas fa-grip-lines"></i>
+  </div>
+`;
 }
