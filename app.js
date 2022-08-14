@@ -1,6 +1,7 @@
 const draggable_list = document.getElementById("draggable-list");
 const check = document.getElementById("check");
 const scoreSpan = document.getElementById("score");
+const showAnswers = document.getElementById("answers");
 
 // HTMLNodes[]
 const listItems = [];
@@ -9,11 +10,15 @@ const theRichest = [];
 
 let dragStartIndex = 0;
 let score = 0;
-let playing = true;
 
-createList();
+createList(true);
 
 check.addEventListener("click", checkOrder);
+
+showAnswers.addEventListener("click", endGame);
+
+// !debugging styles
+// showAnswers.click();
 
 async function getCurrentRichest() {
   const res = await fetch(
@@ -26,26 +31,19 @@ async function getCurrentRichest() {
 }
 
 // Insert list items into DOM
-async function createList() {
-  await getCurrentRichest();
+async function createList(rnd) {
+  if (!theRichest.length) await getCurrentRichest();
 
   const rndArr = randomizeArr(theRichest);
 
-  rndArr.forEach((person, index) => {
-    const listItem = document.createElement("li");
-
-    listItem.setAttribute("data-index", index);
-
-    listItem.innerHTML = returnInnerHtml(index + 1, person);
-
-    listItems.push(listItem);
-
-    draggable_list.appendChild(listItem);
-  });
-
-  addEventListeners();
+  if (rnd) {
+    renderRandomized(rndArr);
+  } else {
+    renderAnswers(theRichest);
+  }
 }
 
+// * Drag funcs
 function dragStart() {
   dragStartIndex = +this.closest("li").getAttribute("data-index");
   console.log("Startting on: ", dragStartIndex);
@@ -103,7 +101,7 @@ function checkOrder() {
 
 function addEventListeners() {
   const draggables = document.querySelectorAll(".draggable");
-  const dragListItems = document.querySelectorAll(".draggable-list li");
+  const dragListItems = document.querySelectorAll("#draggable-list li");
 
   draggables.forEach((draggable) => {
     draggable.addEventListener("dragstart", dragStart);
@@ -115,6 +113,15 @@ function addEventListeners() {
     item.addEventListener("dragenter", dragEnter);
     item.addEventListener("dragleave", dragLeave);
   });
+}
+
+// * End game
+function endGame() {
+  console.log("game has ended, your final score is: ", score);
+  document.getElementById("answers-list").classList.remove("hidden");
+  createList(false);
+  check.disabled = true;
+  showAnswers.disabled = true;
 }
 
 // * HELPERS
@@ -130,12 +137,54 @@ function randomizeArr(arr) {
     .map((a) => a.value);
 }
 
-function returnInnerHtml(index, person) {
-  return `
+function returnInnerHtml(index, person, draggable) {
+  if (draggable) {
+    return `
+    <span class="number">${index}</span>
+    <div class="draggable" draggable="true">
+      <p class="person-name">${person}</p>
+      <i class="fas fa-grip-lines"></i>
+    </div>
+  `;
+  } else {
+    return `
   <span class="number">${index}</span>
-  <div class="draggable" draggable="true">
+  <div class="draggable">
     <p class="person-name">${person}</p>
     <i class="fas fa-grip-lines"></i>
   </div>
 `;
+  }
+}
+
+function renderRandomized(rndArr) {
+  rndArr.forEach((person, index) => {
+    const listItem = document.createElement("li");
+
+    listItem.setAttribute("data-index", index);
+
+    listItem.innerHTML = returnInnerHtml(index + 1, person, true);
+
+    listItems.push(listItem);
+
+    draggable_list.appendChild(listItem);
+  });
+
+  addEventListeners();
+}
+
+function renderAnswers(arr) {
+  const resUl = document.getElementById("answers-list");
+
+  arr.forEach((person, index) => {
+    const listItem = document.createElement("li");
+
+    listItem.setAttribute("data-index", index);
+
+    listItem.innerHTML = returnInnerHtml(index + 1, person, false);
+
+    listItems.push(listItem);
+
+    resUl.appendChild(listItem);
+  });
 }
