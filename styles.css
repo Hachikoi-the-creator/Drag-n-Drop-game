@@ -11,7 +11,7 @@
 }
 
 body {
-  background-image: url("./money.webp");
+  background-image: url("./img/money.webp");
   display: flex;
   flex-direction: column;
   align-items: center;
